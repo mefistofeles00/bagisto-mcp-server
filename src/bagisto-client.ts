@@ -85,7 +85,7 @@ export class BagistoClient {
       Authorization: `Bearer ${token}`,
       Accept: 'application/json',
     }
-    let body: BodyInit | undefined
+    let body: FormData | string | undefined
     if (opts.form) {
       body = opts.form
     } else if (opts.json !== undefined) {
