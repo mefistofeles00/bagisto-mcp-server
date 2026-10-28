@@ -18,6 +18,11 @@ function recordingClient(opts: { responses?: Record<string, unknown>; throwOn?: 
   return client as any
 }
 
+const storeDefaults = {
+  'GET /api/v1/admin/settings/channels': [{ id: 1, code: 'default', name: 'D', default_locale: { code: 'tr' } }],
+  'GET /api/v1/admin/settings/inventory-sources': [{ id: 1, code: 'default' }],
+}
+
 const base: ProductInput = {
   attributeFamilyId: 1,
   sku: 'SK-1',
@@ -37,9 +42,10 @@ describe('createProduct', () => {
     expect(c.calls).toHaveLength(0)
   })
 
-  test('stores a skeleton then PUTs fields, attributes and locale', async () => {
+  test('stores a skeleton then PUTs fields, attributes, locale and scoping channel code', async () => {
     const c = recordingClient({
       responses: {
+        ...storeDefaults,
         'POST /api/v1/admin/catalog/products': { id: 31 },
         'POST /api/v1/admin/catalog/products/31': { id: 31, url_key: 'kolye' },
       },
@@ -50,20 +56,50 @@ describe('createProduct', () => {
       path: '/api/v1/admin/catalog/products',
       json: { type: 'simple', attribute_family_id: 1, sku: 'SK-1' },
     })
-    const form: FormData = c.calls[1].form
-    expect(c.calls[1].path).toBe('/api/v1/admin/catalog/products/31')
+    const put = c.calls.find((x: any) => x.path === '/api/v1/admin/catalog/products/31')!
+    const form: FormData = put.form
     expect(form.get('_method')).toBe('PUT')
     expect(form.get('name')).toBe('Kolye')
     expect(form.get('ayar')).toBe('12')
     expect(form.get('locale')).toBe('tr')
+    expect(form.get('channel')).toBe('default')
     expect(form.getAll('categories[]')).toEqual(['3'])
     expect(form.getAll('channels[]')).toEqual(['1'])
+    expect(form.get('inventories[1]')).toBe('20')
+  })
+
+  test('writes stock to the discovered inventory source id, not a hardcoded 1', async () => {
+    const c = recordingClient({
+      responses: {
+        'GET /api/v1/admin/settings/channels': [{ id: 1, code: 'default', name: 'D', default_locale: { code: 'tr' } }],
+        'GET /api/v1/admin/settings/inventory-sources': [{ id: 7, code: 'wh' }],
+        'POST /api/v1/admin/catalog/products': { id: 31 },
+        'POST /api/v1/admin/catalog/products/31': { id: 31 },
+      },
+    })
+    await createProduct(c, { ...base, inventory: 5 })
+    const put = c.calls.find((x: any) => x.path === '/api/v1/admin/catalog/products/31')!
+    expect(put.form.get('inventories[7]')).toBe('5')
+    expect(put.form.get('inventories[1]')).toBeNull()
+  })
+
+  test('empty channels array falls back to the default channel', async () => {
+    const c = recordingClient({
+      responses: {
+        ...storeDefaults,
+        'POST /api/v1/admin/catalog/products': { id: 31 },
+        'POST /api/v1/admin/catalog/products/31': { id: 31 },
+      },
+    })
+    await createProduct(c, { ...base, channels: [] })
+    const put = c.calls.find((x: any) => x.path === '/api/v1/admin/catalog/products/31')!
+    expect(put.form.getAll('channels[]')).toEqual(['1'])
   })
 
   test('defaults locale and channel from the store when omitted', async () => {
     const c = recordingClient({
       responses: {
-        'GET /api/v1/admin/settings/channels': [{ id: 1, code: 'default', name: 'D', default_locale: { code: 'tr' } }],
+        ...storeDefaults,
         'POST /api/v1/admin/catalog/products': { id: 31 },
         'POST /api/v1/admin/catalog/products/31': { id: 31 },
       },
@@ -78,18 +114,20 @@ describe('createProduct', () => {
   test('sends an HTML description as a literal multipart string', async () => {
     const c = recordingClient({
       responses: {
+        ...storeDefaults,
         'POST /api/v1/admin/catalog/products': { id: 31 },
         'POST /api/v1/admin/catalog/products/31': { id: 31 },
       },
     })
     await createProduct(c, { ...base, description: '<p>el emeği</p>' })
-    const form: FormData = c.calls[1].form
+    const put = c.calls.find((x: any) => x.path === '/api/v1/admin/catalog/products/31')!
+    const form: FormData = put.form
     expect(form.get('description')).toBe('<p>el emeği</p>')
   })
 
   test('rolls back the skeleton and rethrows when the update fails', async () => {
     const c = recordingClient({
-      responses: { 'POST /api/v1/admin/catalog/products': { id: 31 } },
+      responses: { ...storeDefaults, 'POST /api/v1/admin/catalog/products': { id: 31 } },
       throwOn: { 'POST /api/v1/admin/catalog/products/31': new ValidationError('bad', { description: ['required'] }) },
     })
     await expect(createProduct(c, base)).rejects.toBeInstanceOf(ValidationError)
@@ -99,10 +137,11 @@ describe('createProduct', () => {
 
 describe('updateProduct', () => {
   test('writes a second locale without storing a new product', async () => {
-    const c = recordingClient({ responses: { 'POST /api/v1/admin/catalog/products/31': { id: 31 } } })
+    const c = recordingClient({ responses: { ...storeDefaults, 'POST /api/v1/admin/catalog/products/31': { id: 31 } } })
     await updateProduct(c, 31, { ...base, locale: 'en' })
     expect(c.calls.some((x) => x.path === '/api/v1/admin/catalog/products' && x.method === 'POST')).toBe(false)
-    const form: FormData = c.calls[0].form
+    const put = c.calls.find((x: any) => x.path === '/api/v1/admin/catalog/products/31')!
+    const form: FormData = put.form
     expect(form.get('locale')).toBe('en')
   })
 })

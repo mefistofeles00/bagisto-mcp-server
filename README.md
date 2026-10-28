@@ -63,6 +63,14 @@ The server authenticates as an admin. Two modes:
 - Write: `create_product`, `update_product`
 - Verify: `get_product`, `list_products`
 
+## Status
+
+v1 is unit-tested against a mocked API. The write-path field keys and the response shapes
+(`channels[]`, scoping `channel` code, `inventories[<source>]`, product fields) are based on
+Bagisto 2.3.x internals and a manual spike, but have **not yet been verified end-to-end
+against a live store in CI**. Run the e2e test (below) against a real Bagisto 2.3.x before
+relying on it in production.
+
 ## Scope (v1)
 
 - Simple products only.

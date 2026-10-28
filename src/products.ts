@@ -25,17 +25,19 @@ export interface ProductInput {
 
 interface Scope {
   locale: string
-  channels: number[]
+  channelCode: string
+  channelIds: number[]
+  inventorySourceId: number
 }
 
 async function resolveScope(client: BagistoClient, input: ProductInput): Promise<Scope> {
-  if (input.locale && input.channels) {
-    return { locale: input.locale, channels: input.channels }
-  }
   const d = await getDefaults(client)
+  const channelIds = input.channels && input.channels.length > 0 ? input.channels : [input.channel ?? d.channel]
   return {
     locale: input.locale ?? d.locale,
-    channels: input.channels ?? [input.channel ?? d.channel],
+    channelCode: d.channelCode,
+    channelIds,
+    inventorySourceId: d.inventorySourceId,
   }
 }
 
@@ -53,12 +55,13 @@ async function buildForm(input: ProductInput, scope: Scope): Promise<{ form: For
   form.append('status', input.status === false ? '0' : '1')
   form.append('visible_individually', input.visibleIndividually === false ? '0' : '1')
   form.append('locale', scope.locale)
-  for (const ch of scope.channels) form.append('channels[]', String(ch))
+  form.append('channel', scope.channelCode)
+  for (const ch of scope.channelIds) form.append('channels[]', String(ch))
   for (const [code, value] of Object.entries(input.attributes ?? {})) {
     form.append(code, String(value))
   }
   for (const cat of input.categories ?? []) form.append('categories[]', String(cat))
-  if (input.inventory !== undefined) form.append('inventories[1]', String(input.inventory))
+  if (input.inventory !== undefined) form.append(`inventories[${scope.inventorySourceId}]`, String(input.inventory))
 
   const { parts, cleanup } = await resolveImages(input.images ?? [])
   parts.forEach((p, i) => form.append(`images[files][${i}]`, p.blob, p.filename))
