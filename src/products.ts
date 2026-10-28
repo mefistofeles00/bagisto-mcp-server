@@ -80,6 +80,46 @@ export async function updateProduct(
   return { id, urlKey: input.urlKey }
 }
 
+export interface ProductSummary {
+  id: number
+  sku: string
+  name: string
+  price: number
+  status: boolean
+  urlKey: string
+}
+
+function toSummary(r: any): ProductSummary {
+  return {
+    id: r.id,
+    sku: r.sku,
+    name: r.name ?? '',
+    price: Number(r.price ?? 0),
+    status: Boolean(r.status),
+    urlKey: r.url_key ?? '',
+  }
+}
+
+export async function listProducts(
+  client: BagistoClient,
+  query?: Record<string, string | number>
+): Promise<ProductSummary[]> {
+  const rows = await client.request<any[]>('GET', '/api/v1/admin/catalog/products', { query })
+  return rows.map(toSummary)
+}
+
+export async function getProduct(client: BagistoClient, idOrSku: number | string): Promise<ProductSummary> {
+  if (typeof idOrSku === 'number') {
+    const row = await client.request<any>('GET', `/api/v1/admin/catalog/products/${idOrSku}`)
+    return toSummary(row)
+  }
+  const matches = (await listProducts(client)).filter((p) => p.sku === idOrSku)
+  if (matches.length === 0) {
+    throw new Error(`No product found with sku '${idOrSku}'.`)
+  }
+  return matches[0]
+}
+
 export async function createProduct(
   client: BagistoClient,
   input: ProductInput
