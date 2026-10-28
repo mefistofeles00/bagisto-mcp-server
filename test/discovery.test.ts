@@ -8,9 +8,11 @@ import {
   getDefaults,
 } from '../src/discovery.js'
 
-function stubClient(byPath: Record<string, unknown>) {
+function stubClient(byPath: Record<string, unknown>, calls: { path: string; query?: unknown }[] = []) {
   return {
-    request: async <T>(_method: string, path: string): Promise<T> => {
+    calls,
+    request: async <T>(_method: string, path: string, opts: any = {}): Promise<T> => {
+      calls.push({ path, query: opts.query })
       if (!(path in byPath)) throw new Error(`no stub for ${path}`)
       return byPath[path] as T
     },
@@ -70,10 +72,18 @@ describe('discovery', () => {
     expect(await listChannels(c)).toEqual([{ id: 1, code: 'default', name: 'Default', defaultLocale: 'tr' }])
   })
 
-  test('getDefaults returns the first channel id and its default locale', async () => {
+  test('getDefaults returns channel id, channel code, locale and inventory source id', async () => {
     const c = stubClient({
       '/api/v1/admin/settings/channels': [{ id: 1, code: 'default', name: 'Default', default_locale: { code: 'tr' } }],
+      '/api/v1/admin/settings/inventory-sources': [{ id: 3, code: 'wh' }],
     })
-    expect(await getDefaults(c)).toEqual({ locale: 'tr', channel: 1 })
+    expect(await getDefaults(c)).toEqual({ locale: 'tr', channel: 1, channelCode: 'default', inventorySourceId: 3 })
+  })
+
+  test('list reads request all pages via pagination=0', async () => {
+    const calls: { path: string; query?: unknown }[] = []
+    const c = stubClient({ '/api/v1/admin/catalog/attributes': [] }, calls)
+    await listAttributes(c)
+    expect(calls[0].query).toEqual({ pagination: 0 })
   })
 })

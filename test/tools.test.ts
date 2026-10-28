@@ -43,7 +43,11 @@ describe('buildTools', () => {
 
   test('create_product surfaces a ValidationError as a readable error result', async () => {
     const client = stubClient({
-      responses: { 'POST /api/v1/admin/catalog/products': { id: 31 } },
+      responses: {
+        'GET /api/v1/admin/settings/channels': [{ id: 1, code: 'default', name: 'D', default_locale: { code: 'tr' } }],
+        'GET /api/v1/admin/settings/inventory-sources': [{ id: 1, code: 'default' }],
+        'POST /api/v1/admin/catalog/products': { id: 31 },
+      },
       throwOn: { 'POST /api/v1/admin/catalog/products/31': new ValidationError('bad', { description: ['description is required'] }) },
     })
     const tool = buildTools(client).find((t) => t.name === 'create_product')!
