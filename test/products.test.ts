@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { createProduct, updateProduct, type ProductInput } from '../src/products.js'
+import { createProduct, updateProduct, getProduct, listProducts, type ProductInput } from '../src/products.js'
 import { ValidationError } from '../src/bagisto-client.js'
 
 interface Call { method: string; path: string; json?: unknown; form?: FormData }
@@ -104,5 +104,41 @@ describe('updateProduct', () => {
     expect(c.calls.some((x) => x.path === '/api/v1/admin/catalog/products' && x.method === 'POST')).toBe(false)
     const form: FormData = c.calls[0].form
     expect(form.get('locale')).toBe('en')
+  })
+})
+
+describe('verify tools', () => {
+  test('listProducts maps rows to summaries', async () => {
+    const c = recordingClient({
+      responses: {
+        'GET /api/v1/admin/catalog/products': [
+          { id: 31, sku: 'SK-1', name: 'Kolye', price: '1000.0000', status: 1, url_key: 'kolye' },
+        ],
+      },
+    })
+    expect(await listProducts(c)).toEqual([
+      { id: 31, sku: 'SK-1', name: 'Kolye', price: 1000, status: true, urlKey: 'kolye' },
+    ])
+  })
+
+  test('getProduct by numeric id fetches the product resource', async () => {
+    const c = recordingClient({
+      responses: {
+        'GET /api/v1/admin/catalog/products/31': { id: 31, sku: 'SK-1', name: 'Kolye', price: '1000.0000', status: 1, url_key: 'kolye' },
+      },
+    })
+    expect(await getProduct(c, 31)).toEqual({ id: 31, sku: 'SK-1', name: 'Kolye', price: 1000, status: true, urlKey: 'kolye' })
+  })
+
+  test('getProduct by sku filters the product list', async () => {
+    const c = recordingClient({
+      responses: {
+        'GET /api/v1/admin/catalog/products': [
+          { id: 30, sku: 'SK-0', name: 'A', price: '1', status: 1, url_key: 'a' },
+          { id: 31, sku: 'SK-1', name: 'Kolye', price: '1000', status: 1, url_key: 'kolye' },
+        ],
+      },
+    })
+    expect(await getProduct(c, 'SK-1')).toMatchObject({ id: 31, sku: 'SK-1' })
   })
 })
