@@ -65,11 +65,15 @@ The server authenticates as an admin. Two modes:
 
 ## Status
 
-v1 is unit-tested against a mocked API. The write-path field keys and the response shapes
-(`channels[]`, scoping `channel` code, `inventories[<source>]`, product fields) are based on
-Bagisto 2.3.x internals and a manual spike, but have **not yet been verified end-to-end
-against a live store in CI**. Run the e2e test (below) against a real Bagisto 2.3.x before
-relying on it in production.
+v1 is unit-tested against a mocked API, and the full write path (login, discovery, create,
+update with attributes/categories/inventory/scoping, verify, delete) has been **verified
+end-to-end against a live Bagisto 2.3.x store**.
+
+**Image uploads require the store's PHP to support WebP encoding.** Bagisto re-encodes every
+uploaded image to WebP via GD/Imagick on upload; if the server's image library lacks WebP
+support, the upload fails server-side (HTTP 500) regardless of the format you send. Check
+with `php -r 'var_dump(function_exists("imagewebp"));'` on the store. Everything except image
+upload works without it.
 
 ## Scope (v1)
 
