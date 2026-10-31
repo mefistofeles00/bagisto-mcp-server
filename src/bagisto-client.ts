@@ -112,7 +112,9 @@ export class BagistoClient {
     }
 
     if (!res.ok) {
-      throw new Error(`Bagisto API error ${res.status} on ${method} ${path}.`)
+      const detail: any = await res.json().catch(() => null)
+      const msg = detail?.message ?? (typeof detail === 'string' ? detail : '')
+      throw new Error(`Bagisto API error ${res.status} on ${method} ${path}.${msg ? ' ' + msg : ''}`)
     }
 
     const parsed: any = await res.json().catch(() => ({}))
