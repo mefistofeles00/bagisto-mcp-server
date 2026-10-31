@@ -1,5 +1,14 @@
 import { readFile } from 'node:fs/promises'
-import { basename } from 'node:path'
+import { basename, extname } from 'node:path'
+
+const MIME: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.gif': 'image/gif',
+}
 
 export class ImageError extends Error {
   constructor(message: string) {
@@ -46,7 +55,11 @@ async function fromPath(path: string): Promise<ImagePart> {
   } catch (e) {
     throw new ImageError(`Cannot read local image file: ${path}`)
   }
-  return { blob: new Blob([buf]), filename: basename(path) }
+  const type = MIME[extname(path).toLowerCase()]
+  if (!type) {
+    throw new ImageError(`Unsupported image type: ${path} (use png, jpg, jpeg, webp, bmp, gif)`)
+  }
+  return { blob: new Blob([buf], { type }), filename: basename(path) }
 }
 
 export async function resolveImages(

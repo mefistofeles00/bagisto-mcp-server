@@ -51,7 +51,7 @@ async function buildForm(input: ProductInput, scope: Scope): Promise<{ form: For
   form.append('short_description', input.shortDescription)
   form.append('description', input.description)
   form.append('price', String(input.price))
-  if (input.weight !== undefined) form.append('weight', String(input.weight))
+  form.append('weight', String(input.weight ?? 0))
   form.append('status', input.status === false ? '0' : '1')
   form.append('visible_individually', input.visibleIndividually === false ? '0' : '1')
   form.append('locale', scope.locale)
