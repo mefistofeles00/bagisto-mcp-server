@@ -27,6 +27,7 @@ describe('resolveImages', () => {
     expect(parts).toHaveLength(1)
     expect(parts[0].filename).toBe(basename(p))
     expect(parts[0].blob.size).toBe(8)
+    expect(parts[0].blob.type).toBe('image/png')
     await cleanup()
   })
 

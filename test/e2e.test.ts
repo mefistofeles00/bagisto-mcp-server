@@ -26,7 +26,13 @@ describe.skipIf(!live)('e2e against a live Bagisto', () => {
 
     const dir = await mkdtemp(join(tmpdir(), 'e2e-'))
     const img = join(dir, 'e2e.png')
-    await writeFile(img, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    await writeFile(
+      img,
+      Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        'base64'
+      )
+    )
 
     const sku = `E2E-${Date.now()}`
     const { id } = await createProduct(client, {
@@ -37,6 +43,7 @@ describe.skipIf(!live)('e2e against a live Bagisto', () => {
       shortDescription: '<p>e2e</p>',
       description: '<p>e2e</p>',
       price: 1234,
+      weight: 2,
       attributes: select ? { [select.code]: select.options[0].id } : {},
       categories: cats[0] ? [cats[0].id] : [],
       inventory: 5,

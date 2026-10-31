@@ -68,6 +68,19 @@ describe('createProduct', () => {
     expect(form.get('inventories[1]')).toBe('20')
   })
 
+  test('sends weight defaulting to 0 when omitted, since Bagisto requires it', async () => {
+    const c = recordingClient({
+      responses: {
+        ...storeDefaults,
+        'POST /api/v1/admin/catalog/products': { id: 31 },
+        'POST /api/v1/admin/catalog/products/31': { id: 31 },
+      },
+    })
+    await createProduct(c, base)
+    const put = c.calls.find((x: any) => x.path === '/api/v1/admin/catalog/products/31')!
+    expect(put.form.get('weight')).toBe('0')
+  })
+
   test('writes stock to the discovered inventory source id, not a hardcoded 1', async () => {
     const c = recordingClient({
       responses: {
