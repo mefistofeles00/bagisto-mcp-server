@@ -1,23 +1,39 @@
 # Bagisto MCP Server
 
-An [MCP](https://modelcontextprotocol.io) server that lets an AI assistant create, update,
-and verify **products** on any [Bagisto](https://bagisto.com) 2.3.x store — talking to the
-store's official admin REST API. Give the AI a photo and some details; it adds the product
-and it goes live on the storefront.
+Add products to a [Bagisto](https://bagisto.com) store by talking to an AI assistant.
+Hand it a photo and a few details — "create a 22k gold ring, 1200 TL, 4 grams, in stock" —
+and it shows up on the storefront.
 
-Store-agnostic: it discovers each store's attribute families, attributes (with options),
-categories, locales, and channels at runtime, so the same tool works for a jewelry shop or
-a shoe shop.
+This is an [MCP](https://modelcontextprotocol.io) server. It plugs into any MCP-capable
+assistant (Claude Desktop, and others) and gives it a small set of tools for managing
+products on your Bagisto store over the store's official admin REST API. Nothing is patched
+into Bagisto itself; the server runs on its own and speaks HTTP to your store.
 
-## Prerequisites
+It's store-agnostic on purpose. There's no hardcoded list of attributes or categories — the
+server asks your store what it has (attribute families, attributes and their options,
+categories, locales, channels) and works from that. A jewelry shop and a shoe shop use the
+exact same build.
 
-On your Bagisto store, install the official REST API package so the admin API is available:
+## What it can do
 
-```bash
-composer require bagisto/rest-api
-```
+- **Create and update products** — simple products, with attributes, categories, stock, and
+  images (from a local file path or a URL).
+- **Inspect the store** — list attribute families, attributes, categories, locales, channels,
+  so the assistant knows what values are valid before it writes anything.
+- **Verify its own work** — fetch a product by id or SKU, or list products, to confirm what
+  landed.
 
-(Run its install/discover step so the `api/v1/admin/*` routes are live.)
+## Requirements
+
+- A Bagisto 2.3.x store with the official REST API installed:
+
+  ```bash
+  composer require bagisto/rest-api
+  ```
+
+  Run its install/discover step so the `api/v1/admin/*` routes are live.
+
+- Node.js 20 or newer.
 
 ## Install
 
@@ -27,19 +43,22 @@ npm install -g bagisto-mcp-server
 
 ## Configure
 
-The server authenticates as an admin. Two modes:
+The server acts as an admin. Give it credentials one of two ways:
 
-- **Email + password (recommended):** the server logs in and manages the token for you.
-- **Token:** supply a pre-minted admin token instead.
+- **Email + password** (easiest) — it logs in and keeps the token fresh for you.
+- **A pre-minted admin token** — if you'd rather manage the token yourself.
 
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `BAGISTO_URL` | yes | e.g. `https://store.example.com` |
-| `BAGISTO_ADMIN_EMAIL` | one mode | admin email |
-| `BAGISTO_ADMIN_PASSWORD` | one mode | admin password |
-| `BAGISTO_ADMIN_TOKEN` | other mode | wins over email/password if set |
+| Variable | Needed | Notes |
+|----------|--------|-------|
+| `BAGISTO_URL` | always | e.g. `https://store.example.com`, no trailing slash |
+| `BAGISTO_ADMIN_EMAIL` | email mode | admin email |
+| `BAGISTO_ADMIN_PASSWORD` | email mode | admin password |
+| `BAGISTO_ADMIN_TOKEN` | token mode | takes precedence if set |
 
-### MCP client (e.g. Claude Desktop)
+Keep these out of version control — they're secrets. Use your MCP client's env config or a
+`.env` file that's gitignored.
+
+### Claude Desktop
 
 ```json
 {
@@ -49,7 +68,7 @@ The server authenticates as an admin. Two modes:
       "env": {
         "BAGISTO_URL": "https://store.example.com",
         "BAGISTO_ADMIN_EMAIL": "admin@example.com",
-        "BAGISTO_ADMIN_PASSWORD": "••••••"
+        "BAGISTO_ADMIN_PASSWORD": "your-password"
       }
     }
   }
@@ -58,46 +77,60 @@ The server authenticates as an admin. Two modes:
 
 ## Tools
 
-- Discovery: `list_attribute_families`, `list_attributes`, `list_categories`,
-  `list_locales`, `list_channels`
-- Write: `create_product`, `update_product`
-- Verify: `get_product`, `list_products`
+| Tool | What it does |
+|------|--------------|
+| `list_attribute_families` | List attribute families |
+| `list_attributes` | List attributes with their options |
+| `list_categories` | List categories |
+| `list_locales` | List store locales |
+| `list_channels` | List sales channels |
+| `create_product` | Create a simple product |
+| `update_product` | Update a product (also used to add another locale) |
+| `get_product` | Fetch a product by id or SKU |
+| `list_products` | List products |
 
-## Status
+## A note on product images
 
-v1 is unit-tested against a mocked API, and the full write path (login, discovery, create,
-update with attributes/categories/inventory/scoping, verify, delete) has been **verified
-end-to-end against a live Bagisto 2.3.x store**.
+Bagisto re-encodes every uploaded image to WebP on its side, using the server's GD/Imagick.
+If your PHP doesn't have WebP support, image uploads fail with a 500 — no matter what format
+you send. You can check with:
 
-**Image uploads require the store's PHP to support WebP encoding.** Bagisto re-encodes every
-uploaded image to WebP via GD/Imagick on upload; if the server's image library lacks WebP
-support, the upload fails server-side (HTTP 500) regardless of the format you send. Check
-with `php -r 'var_dump(function_exists("imagewebp"));'` on the store. Everything except image
-upload works without it.
+```bash
+php -r 'var_dump(function_exists("imagewebp"));'
+```
 
-## Scope (v1)
+If that prints `false`, enable WebP in your PHP image extension. Everything other than image
+upload works regardless.
+
+## Scope
+
+v1 is deliberately small:
 
 - Simple products only.
-- One locale per call — to translate a product into another locale, call `update_product`
-  again with a different `locale`.
-- Reads categories; does not create them yet.
+- One locale per call. To translate a product, call `update_product` again with a different
+  `locale`.
+- Reads categories; doesn't create them yet.
 - No order or customer tools yet.
 
-## Develop
+The create → update → verify → delete path has been exercised end to end against a live
+Bagisto 2.3.x store.
+
+## Development
 
 ```bash
 npm install
-npm test          # unit tests (mocked HTTP)
+npm test        # unit tests, mocked HTTP
 npm run build
 ```
 
-End-to-end test against a disposable Bagisto with `bagisto/rest-api` installed:
+There's an end-to-end test that runs against a real store. It creates a throwaway product and
+deletes it afterwards:
 
 ```bash
 BAGISTO_URL=… BAGISTO_ADMIN_EMAIL=… BAGISTO_ADMIN_PASSWORD=… npx vitest run test/e2e.test.ts
 ```
 
-Without `BAGISTO_URL` the e2e test is skipped.
+Without `BAGISTO_URL` it's skipped.
 
 ## License
 
