@@ -118,6 +118,16 @@ describe('BagistoClient', () => {
     expect(calls.filter((x) => new URL(x.url).pathname === '/api/v1/admin/catalog/products')).toHaveLength(1)
   })
 
+  test('a 500 error surfaces the server-provided message for debugging', async () => {
+    const fake = fakeFetch([], {
+      'GET /api/v1/admin/catalog/products': { status: 500, body: { message: 'Call to a member function on null' } },
+    })
+    const c = new BagistoClient({ baseUrl: 'https://s.test', auth: { token: 't' } }, fake as any)
+    const err = await c.request('GET', '/api/v1/admin/catalog/products').catch((e) => e)
+    expect(err.message).toContain('500')
+    expect(err.message).toContain('Call to a member function on null')
+  })
+
   test('never includes the password or token in a thrown error', async () => {
     const fake = fakeFetch([], {
       'POST /api/v1/admin/login': { status: 401, body: { message: 'Invalid credentials.' } },
