@@ -43,6 +43,18 @@ describe('BagistoClient', () => {
     expect(calls.at(-1)!.headers.Authorization).toBe('Bearer tok123')
   })
 
+  test('login sends device_name so the token endpoint accepts a non-stateful client', async () => {
+    const calls: RecordedCall[] = []
+    const fake = fakeFetch(calls, {
+      'POST /api/v1/admin/login': { status: 200, body: { token: 'tok123' } },
+      'GET /api/v1/admin/catalog/categories': { status: 200, body: { data: [] } },
+    })
+    const c = new BagistoClient({ baseUrl: 'https://s.test', auth: { email: 'a@b.c', password: 'p' } }, fake as any)
+    await c.request('GET', '/api/v1/admin/catalog/categories')
+    const loginCall = calls.find((x) => new URL(x.url).pathname === '/api/v1/admin/login')!
+    expect(JSON.parse(String(loginCall.body)).device_name).toBeTruthy()
+  })
+
   test('uses a provided token without calling login', async () => {
     const calls: RecordedCall[] = []
     const fake = fakeFetch(calls, {
