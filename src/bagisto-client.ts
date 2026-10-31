@@ -48,7 +48,7 @@ export class BagistoClient {
     const res = await this.fetchImpl(`${this.config.baseUrl}/api/v1/admin/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ email: auth.email, password: auth.password }),
+      body: JSON.stringify({ email: auth.email, password: auth.password, device_name: 'bagisto-mcp-server' }),
     })
     if (!res.ok) {
       throw new AuthError('Login failed: check BAGISTO_ADMIN_EMAIL / BAGISTO_ADMIN_PASSWORD.')
